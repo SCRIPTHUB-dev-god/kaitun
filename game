@@ -7,7 +7,7 @@ local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 
 local GAME_DATABASE = {
-    [9872472334] = "https://pastefy.app/0yLencSG/raw",
+    [9872472334] = "https://pastebin.com/raw/MSJeBNV1",
     [537413528] = "https://pastefy.app/1lZXcXzH/raw",
 }
 
