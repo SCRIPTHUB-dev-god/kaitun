@@ -1,1 +1,224 @@
+-- v1.0 | Initial release - Game ID filter system with auto-loadstring functionality
+-- Features: Multi-game detection, automatic script loading, fallback handler, exploit compatibility layer
 
+local GameFilters = {}
+local HttpService = game:GetService("HttpService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+local GAME_DATABASE = {
+    [9872472334] = "https://pastefy.app/0yLencSG/raw",
+    [537413528] = "https://pastebin.com/raw/MSJeBNV1",
+}
+
+local FALLBACK_SCRIPT = "https://raw.githubusercontent.com/example/universal/main/script.lua"
+
+function GameFilters:GetCurrentGameId()
+    return game.PlaceId
+end
+
+function GameFilters:GetGameUniverseId()
+    local success, universeId = pcall(function()
+        return game.GameId
+    end)
+    return success and universeId or nil
+end
+
+function GameFilters:ValidateUrl(url)
+    if not url or type(url) ~= "string" then
+        return false
+    end
+    if not url:match("^https?://") then
+        return false
+    end
+    if url:match("[<>\"'%%{}|\\^`%[%]]") then
+        return false
+    end
+    return true
+end
+
+function GameFilters:FetchScript(url)
+    local attempts = 0
+    local maxAttempts = 3
+    local retryDelay = 2
+    
+    while attempts < maxAttempts do
+        local success, result = pcall(function()
+            if syn and syn.request then
+                local response = syn.request({
+                    Url = url,
+                    Method = "GET"
+                })
+                if response.StatusCode == 200 then
+                    return response.Body
+                end
+                error("HTTP " .. response.StatusCode)
+            elseif request then
+                local response = request({
+                    Url = url,
+                    Method = "GET"
+                })
+                if response.StatusCode == 200 then
+                    return response.Body
+                end
+                error("HTTP " .. response.StatusCode)
+            elseif http_request then
+                local response = http_request({
+                    Url = url,
+                    Method = "GET"
+                })
+                if response.StatusCode == 200 then
+                    return response.Body
+                end
+                error("HTTP " .. response.StatusCode)
+            else
+                error("No HTTP library available")
+            end
+        end)
+        
+        if success then
+            return true, result
+        end
+        
+        attempts = attempts + 1
+        if attempts < maxAttempts then
+            wait(retryDelay)
+            retryDelay = retryDelay * 2
+        end
+    end
+    
+    return false, "Failed after " .. maxAttempts .. " attempts"
+end
+
+function GameFilters:ExecuteScript(scriptContent)
+    local environments = {
+        {name = "loadstring", func = loadstring},
+        {name = "load", func = load}
+    }
+    
+    for _, env in ipairs(environments) do
+        if env.func then
+            local success, result = pcall(function()
+                local func, err = env.func(scriptContent)
+                if not func then
+                    error("Compilation failed: " .. tostring(err))
+                end
+                return func()
+            end)
+            
+            if success then
+                return true, "Executed via " .. env.name
+            end
+        end
+    end
+    
+    return false, "All execution methods failed"
+end
+
+function GameFilters:LoadForGame(gameId)
+    local scriptUrl = GAME_DATABASE[gameId]
+    
+    if not scriptUrl then
+        warn("[GameFilter] No specific script for Game ID: " .. tostring(gameId))
+        scriptUrl = FALLBACK_SCRIPT
+        warn("[GameFilter] Loading universal fallback script")
+    else
+        print("[GameFilter] Found script for Game ID: " .. tostring(gameId))
+    end
+    
+    if not self:ValidateUrl(scriptUrl) then
+        error("[GameFilter] Invalid or malicious URL detected")
+        return false
+    end
+    
+    print("[GameFilter] Fetching script from: " .. scriptUrl)
+    local fetchSuccess, scriptContent = self:FetchScript(scriptUrl)
+    
+    if not fetchSuccess then
+        warn("[GameFilter] Fetch failed: " .. tostring(scriptContent))
+        if scriptUrl ~= FALLBACK_SCRIPT then
+            warn("[GameFilter] Attempting fallback script")
+            return self:LoadForGame(nil)
+        end
+        return false
+    end
+    
+    print("[GameFilter] Script fetched successfully (" .. #scriptContent .. " bytes)")
+    local execSuccess, execResult = self:ExecuteScript(scriptContent)
+    
+    if execSuccess then
+        print("[GameFilter] Script executed successfully")
+        print("[GameFilter] " .. execResult)
+        return true
+    else
+        warn("[GameFilter] Execution failed: " .. tostring(execResult))
+        return false
+    end
+end
+
+function GameFilters:Initialize()
+    local gameId = self:GetCurrentGameId()
+    local universeId = self:GetGameUniverseId()
+    
+    local totalGames = 0
+    for _ in pairs(GAME_DATABASE) do
+        totalGames = totalGames + 1
+    end
+    print("[GameFilter] Database contains " .. totalGames .. " game(s)")
+    
+    wait(0.5)
+    
+    local success = self:LoadForGame(gameId)
+    
+    if success then
+        print("[GameFilter] System initialized successfully")
+    else
+        warn("[GameFilter] System initialization failed")
+    end
+    
+    return success
+end
+
+function GameFilters:AddGame(gameId, scriptUrl)
+    if type(gameId) ~= "number" then
+        warn("[GameFilter] Invalid game ID type")
+        return false
+    end
+    
+    if not self:ValidateUrl(scriptUrl) then
+        warn("[GameFilter] Invalid script URL")
+        return false
+    end
+    
+    GAME_DATABASE[gameId] = scriptUrl
+    print("[GameFilter] Added game " .. tostring(gameId) .. " to database")
+    return true
+end
+
+function GameFilters:RemoveGame(gameId)
+    if GAME_DATABASE[gameId] then
+        GAME_DATABASE[gameId] = nil
+        print("[GameFilter] Removed game " .. tostring(gameId) .. " from database")
+        return true
+    end
+    warn("[GameFilter] Game " .. tostring(gameId) .. " not found in database")
+    return false
+end
+
+function GameFilters:ListGames()
+    for gameId, url in pairs(GAME_DATABASE) do
+        print("[GameFilter] " .. tostring(gameId) .. " -> " .. url)
+    end
+end
+
+function GameFilters:SetFallback(url)
+    if not self:ValidateUrl(url) then
+        warn("[GameFilter] Invalid fallback URL")
+        return false
+    end
+    FALLBACK_SCRIPT = url
+    print("[GameFilter] Fallback script updated")
+    return true
+end
+
+return GameFilters:Initialize()
