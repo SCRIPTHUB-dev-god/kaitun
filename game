@@ -11,7 +11,7 @@ local GAME_DATABASE = {
     [537413528] = "https://pastebin.com/raw/MSJeBNV1",
 }
 
-local FALLBACK_SCRIPT = "https://raw.githubusercontent.com/example/universal/main/script.lua"
+local FALLBACK_SCRIPT = "https://pastebin.com/raw/yr0Z7c2h"
 
 function GameFilters:GetCurrentGameId()
     return game.PlaceId
